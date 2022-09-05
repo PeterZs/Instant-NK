@@ -47,7 +47,7 @@ OMP_NUM_THREADS=8 CUDA_VISIBLE_DEVICES=${CUDA_DEVICE} python train_nerf.py "${IN
 
 # Results
 Here are some reconstruction results from our Instant-NSR code:
-<img src="assets/compare_gallery1.png" height="300"/> 
+<img src="assets/compare_gallery1.png" height="400"/> 
 
 # Acknowledgement
 
