@@ -1,152 +1,65 @@
-# torch-ngp
-
-A pytorch implementation of [instant-ngp](https://github.com/NVlabs/instant-ngp), as described in [_Instant Neural Graphics Primitives with a Multiresolution Hash Encoding_](https://nvlabs.github.io/instant-ngp/assets/mueller2022instant.pdf).
-
-**News**: With the CUDA ray marching option for NeRF, we can:
-* converge to a reasonable result in **~1min** (50 epochs). 
-* render a 1920x1080 image in **~1s**. 
-
-For the LEGO dataset, we can reach **~10FPS** at 800x800 due to efficient voxel pruning.
-
-(Tested on the fox dataset with a TITAN RTX. The speed is still 2-5x slower compared to the original implementation.)
-
-**A GUI for training/visualizing NeRF is also available!**
-
-https://user-images.githubusercontent.com/25863658/155265815-c608254f-2f00-4664-a39d-e00eae51ca59.mp4
+# Instant-NK(Instant Neural Tracker, Pytorch)
 
 
-# Progress
+A pytorch implementation of instant-NK based on [torch-ngp](https://github.com/ashawkey/torch-ngp) as described in Human Performance Modeling and Rendering via Neural Animated Mesh.
 
-As the official pytorch extension [tinycudann](https://github.com/NVlabs/tiny-cuda-nn) has been released, the following implementations can be used as modular alternatives. 
-The performance and speed of these modules are guaranteed to be on-par, and we support using tinycudann as the backbone by the `--tcnn` flag.
-Later development will be focused on reproducing the NeRF inference speed.
 
-* Fully-fused MLP
-    - [x] basic pytorch binding of the [original implementation](https://github.com/NVlabs/tiny-cuda-nn)
-* HashGrid Encoder
-    - [x] basic pytorch CUDA extension
-    - [x] fp16 support 
-* Experiments
-    - SDF
-        - [x] baseline
-        - [ ] better SDF calculation (especially for non-watertight meshes)
-    - NeRF
-        - [x] baseline
-        - [x] ray marching in CUDA.
-* NeRF GUI
-    - [x] supports training.
-* Misc.
-    - [ ] improve speed (e.g., avoid the `cat` in NeRF forward)
-    - [x] support blender dataset format.
-    - [ ] support LLFF dataset format.
+
+<img src="assets/am_pipeline.png" height="270"/> 
+We propose a hybrid neural tracker to generate animated meshes, which combines explicit non-rigid tracking with implicit
+dynamic deformation in a self-supervised framework. The former provides
+the coarse warping back into the canonical space, while the latter implicit
+one further predicts the displacements using the 4D hash encoding as in our
+reconstructor.
 
 
 # Install
+
+First, you need to set training 
 ```bash
 pip install -r requirements.txt
-
-# (optional) install the tcnn backbone
-pip install git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
 ```
-Tested on Ubuntu with torch 1.10 & CUDA 11.3 on TITAN RTX.
-
-# Dynamic Usage
-```bash
-#train
-OMP_NUM_THREADS=8 CUDA_HOME=/usr/local/cuda-11.3  CUDA_VISIBLE_DEVICES=0 python train_nerf.py /data/new_disk2/wangla/Dataset/NGP/xzq_white_crop/ --workspace xzq_fourier20_timedeform --fp16 --mode nhr  --bound 1 --num_steps 256 --upsample_steps 256 --num_frames 20 --dyna_mode fourier
-
-#test
-OMP_NUM_THREADS=8 CUDA_HOME=/usr/local/cuda-11.3  CUDA_VISIBLE_DEVICES=0 python test_nerf.py /data/new_disk2/wangla/Dataset/NGP/FVV_xzq/ --workspace xzq_fourier20_time --mode nhr  --bound 1 --num_steps 256 --upsample_steps 256 --num_frames 20 --dyna_mode time
-```
+Tested on Ubuntu with torch 1.10.1 & CUDA 11.1 on RTX 3090.
 
 # Usage
 
-We use the same data format as instant-ngp, e.g., [armadillo](https://github.com/NVlabs/instant-ngp/blob/master/data/sdf/armadillo.obj) and [fox](https://github.com/NVlabs/instant-ngp/tree/master/data/nerf/fox). 
-Please download and put them under `./data`.
+We use the same data format as nerf and instant-ngp. 
+To perpare the mesh for subsequent non-rigid tracking, you should run the [instant-nsr](https://github.com/zhaofuq/Instant-NSR/) or other reconstruction algorithms.
+
+For non-rigid tracking, you can perform [DynamicFusion](https://github.com/dolphin-li/DynamicFusion) or other non-rigid registration methods to acquire the ED nodes and motions.
+
 
 First time running will take some time to compile the CUDA extensions.
 
+
+Train your own models, you can run following shell:
 ```bash
-# SDF experiment
-bash scripts/run_sdf.sh
-
-# NeRF experiment (see the shell script for more options)
-bash scripts/run_nerf.sh
-
-# NeRF GUI
-bash scripts/run_gui_nerf.sh
-
-# use different backbones
-# for the colmap dataset, the default dataset setting `--mode colmap --bound 2 --scale 0.33` is used.
-python train_nerf.py data/fox --workspace trial_nerf # fp32 mode
-python train_nerf.py data/fox --workspace trial_nerf --fp16 # fp16 mode (pytorch amp)
-python train_nerf.py data/fox --workspace trial_nerf --fp16 --ff # fp16 mode + FFMLP (this repo's implementation)
-python train_nerf.py data/fox --workspace trial_nerf --fp16 --tcnn # fp16 mode + official tinycudann's encoder & MLP
-
-# use CUDA to accelerate ray marching 
-python train_nerf.py data/fox --workspace trial_nerf --fp16 --ff --cuda_ray # fp16 mode + FFMLP + cuda raymarching
-
-# start a GUI for NeRF training & visualization
-# always use with `--fp16 --ff/tcnn --cuda_ray` for an acceptable framerate!
-# train, save, and infer.
-python gui_nerf.py data/fox --workspace trial_nerf --fp16 --ff --cuda_ray --train
-# do not train, only visualizing a pretrained model.
-python gui_nerf.py data/fox --workspace trial_nerf --fp16 --ff --cuda_ray
-
-# for the blender dataset, you should add `--mode blender --bound 1 --scale 0.8`
-# --bound means the scene is assumed to be inside box[-bound, bound]
-# --scale adjusts the camera locaction to make sure it falls inside the above bounding box.
-python train_nerf.py data/nerf_synthetic/lego --workspace trial_nerf --fp16 --ff --cuda_ray --mode blender --bound 1 --scale 0.8 
+# Instant-NSR Training
+OMP_NUM_THREADS=8 CUDA_VISIBLE_DEVICES=${CUDA_DEVICE} python train_nerf.py "${INPUTS}/spider" --ed_folder "${INPUTS}/ed_folder"  --workspace "${WORKSAPCE}"    --st_frame 0 --num_image 76 --num_frames 10 --dyna_mode deform
 ```
 
-# Difference from the original implementation
-* Instead of assuming the scene is bounded in the unit box `[0, 1]` and centered at `(0.5, 0.5, 0.5)`, this repo assumes **the scene is bounded in box `[-bound, bound]`, and centered at `(0, 0, 0)`**. Therefore, the functionality of `aabb_scale` is replaced by `bound` here.
-* For the hashgrid encoder, this repo only implement the linear interpolation mode.
-* For the voxel pruning in ray marching kernels, this repo doesn't implement the multi-scale density grid (check the `mip` keyword), and only use one `128x128x128` grid for simplicity. Instead of updating the grid every 16 steps, we update it every epoch, which may lead to slower first few epochs if using `--cuda_ray`.
+Then, you can extract surface from the trained network model by: 
+```bash
+# 
+OMP_NUM_THREADS=8 CUDA_VISIBLE_DEVICES=${CUDA_DEVICE} python train_nerf.py "${INPUTS}/spider" --ed_folder "${INPUTS}/ed_folder"  --workspace "${WORKSAPCE}"    --st_frame 0 --num_image 76 --num_frames 10 --dyna_mode deform --test
 
-# Update Logs
-* 2.23: better support for the blender dataset.
-* 2.22: add GUI for NeRF training.
-* 2.21: add GUI for NeRF visualizing. 
-    * With the GUI, I find the trained NeRF model is very noisy outside the seen region (unlike the original implementation)... 
-    * check `mark_untrained_density_grid`, but still, they looks much better even with the noises.
-* 2.20: cuda raymarching is finally stable now!
-* 2.15: add the official [tinycudann](https://github.com/NVlabs/tiny-cuda-nn) as an alternative backend.    
-* 2.10: add cuda_ray, can train/infer faster, but performance is worse currently.
-* 2.6: add support for RGBA image.
-* 1.30: fixed atomicAdd() to use __half2 in HashGrid Encoder's backward, now the training speed with fp16 is as expected!
-* 1.29: 
-    * finished an experimental binding of fully-fused MLP.
-    * replace SHEncoder with a CUDA implementation.
-* 1.26: add fp16 support for HashGrid Encoder (requires CUDA >= 10 and GPU ARCH >= 70 for now...).
+```
 
+# Results
+Here are some reconstruction results from our Instant-NSR code:
+<img src="assets/compare_gallery1.png" height="300"/> 
 
 # Acknowledgement
 
-* Credits to [Thomas Müller](https://tom94.net/) for the amazing [tiny-cuda-nn](https://github.com/NVlabs/tiny-cuda-nn) and [instant-ngp](https://github.com/NVlabs/instant-ngp):
-    ```
-    @misc{tiny-cuda-nn,
-        Author = {Thomas M\"uller},
-        Year = {2021},
-        Note = {https://github.com/nvlabs/tiny-cuda-nn},
-        Title = {Tiny {CUDA} Neural Network Framework}
-    }
-
-    @article{mueller2022instant,
-        title = {Instant Neural Graphics Primitives with a Multiresolution Hash Encoding},
-        author = {Thomas M\"uller and Alex Evans and Christoph Schied and Alexander Keller},
-        journal = {arXiv:2201.05989},
-        year = {2022},
-        month = jan
-    }
-    ```
-
-* The framework of NeRF is adapted from [nerf_pl](https://github.com/kwea123/nerf_pl):
-    ```
-    @misc{queianchen_nerf,
-        author = {Quei-An, Chen},
-        title = {Nerf_pl: a pytorch-lightning implementation of NeRF},
-        url = {https://github.com/kwea123/nerf_pl/},
+Our code is implemented on torch-ngp code base:
+```
+@misc{torch-ngp,
+    Author = {Jiaxiang Tang},
+    Year = {2022},
+    Note = {https://github.com/ashawkey/torch-ngp},
+    Title = {Torch-ngp: a PyTorch implementation of instant-ngp}
+}
+```erf_pl/},
         year = {2020},
     }
     ```
