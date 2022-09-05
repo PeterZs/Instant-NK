@@ -1,4 +1,4 @@
-# Instant-NK(Instant Neural Tracker, Pytorch)
+# Instant-NK(Instant Neural tracKer, Pytorch)
 
 
 A pytorch implementation of instant-NK based on [torch-ngp](https://github.com/ashawkey/torch-ngp) as described in Human Performance Modeling and Rendering via Neural Animated Mesh.
